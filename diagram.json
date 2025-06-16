@@ -1,28 +1,33 @@
 {
   "version": 1,
-  "author": "Projeto Interfone",
+  "author": "Projeto Interfone – 1 buzzer",
   "editor": "wokwi",
   "parts": [
-    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 80, "left": 0, "attrs": {} },
 
-    { "type": "wokwi-led", "id": "ledDisponivel", "top": 30, "left": 180, "attrs": { "color": "blue", "label": "Disponível" } },
-    { "type": "wokwi-resistor", "id": "rBlue", "top": 70, "left": 200, "attrs": { "value": "220" } },
+    { "type": "wokwi-buzzer", "id": "buzzer", "top": -40, "left": 60, "attrs": { "label": "Buzzer (25)" } },
 
-    { "type": "wokwi-led", "id": "ledRele", "top": 30, "left": 110, "attrs": { "color": "green", "label": "Relé" } },
-    { "type": "wokwi-resistor", "id": "rGreen", "top": 70, "left": 130, "attrs": { "value": "220" } }
+    { "type": "wokwi-led", "id": "ledRele", "top": 0, "left": 170, "attrs": { "color": "green", "label": "Relé (14)" } },
+    { "type": "wokwi-resistor", "id": "rRele", "top": 40, "left": 190, "attrs": { "value": "220" } },
+
+    { "type": "wokwi-led", "id": "ledAvail", "top": 0, "left": 250, "attrs": { "color": "blue", "label": "Habilitado (27)" } },
+    { "type": "wokwi-resistor", "id": "rAvail", "top": 40, "left": 270, "attrs": { "value": "220" } }
   ],
 
   "connections": [
-    [ "esp:TX", "$serialMonitor:RX", "", [] ],
-    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    ["esp:TX", "$serialMonitor:RX", "", []],
+    ["esp:RX", "$serialMonitor:TX", "", []],
 
-    [ "esp:27", "ledDisponivel:A", "blue", [ "v0", "h20" ] ],
-    [ "ledDisponivel:C", "rBlue:1", "black", [ "v10" ] ],
-    [ "rBlue:2", "esp:GND.1", "black", [ "h-30", "v20" ] ],
+    ["esp:25", "buzzer:SIG", "red", []],
+    ["buzzer:GND", "esp:GND.1", "black", []],
 
-    [ "esp:14", "ledRele:A", "green", [ "v0", "h20" ] ],
-    [ "ledRele:C", "rGreen:1", "black", [ "v10" ] ],
-    [ "rGreen:2", "esp:GND.2", "black", [ "h-30", "v20" ] ]
+    ["esp:14", "ledRele:A", "green", []],
+    ["ledRele:C", "rRele:1", "black", []],
+    ["rRele:2", "esp:GND.2", "black", []],
+
+    ["esp:27", "ledAvail:A", "blue", []],
+    ["ledAvail:C", "rAvail:1", "black", []],
+    ["rAvail:2", "esp:GND.2", "black", []]
   ],
 
   "dependencies": {}

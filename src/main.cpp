@@ -10,100 +10,122 @@
 #define BROKER_PASSWORD  "admin123"
 
 // Pinos de hardware
-#define RELAY_PIN         14   // aciona o relé que atende o telefone
-#define AVAIL_LED_PIN     27   // indica se o sistema está habilitado
+#define RELAY_PIN        14   // relé: atende o telefone
+#define AVAIL_LED_PIN    27   // LED azul: sistema habilitado
+#define BUZZ_PIN         25   // único buzzer
+#define BUZZ_CH          0    // Canal LEDC
 
 // ===================== OBJETOS GLOBAIS ==================
 WiFiClient client;
 HADevice device("ESP32_Interfone_IoT");
 HAMqtt   mqtt(client, device);
 
-// Switches expostos ao Home Assistant
-HASwitch interfoneEnable("interfone_enable");   // Liga / desliga o sistema
-HASwitch interfoneRingSim("interfone_ring_sim"); // Simula toque do interfone
+HASwitch swEnable("interfone_enable");     // Liga/desliga sistema
+HASwitch swRing("interfone_ring_sim");      // Simula toque do interfone
 
 bool sistemaHabilitado = false;
-bool acaoEmProgresso   = false;
 
 // ========================================================
-// CALLBACKS
-// --------------------------------------------------------
-void onEnableCommand(bool state, HASwitch* sender) {
-  sistemaHabilitado = state;
-  digitalWrite(AVAIL_LED_PIN, state);
-  sender->setState(state);
-  Serial.println(state ? "[Sistema] HABILITADO" : "[Sistema] DESABILITADO");
+// FUNÇÕES DE SOM -----------------------------------------
+void playTone(uint16_t freq, uint16_t durMs) {
+  if (freq == 0) {
+    ledcWriteTone(BUZZ_CH, 0);
+    ledcWrite(BUZZ_CH, 0);
+  } else {
+    ledcWrite(BUZZ_CH, 128);      // 50% duty para animar ícone
+    ledcWriteTone(BUZZ_CH, freq);
+  }
+  delay(durMs);
 }
 
-void onRingSimCommand(bool state, HASwitch* sender) {
-  if (!state) {                   // só reage quando liga o switch
-    return;                       // ignore OFF
-  }
+void tocarRing() {
+  Serial.println("[Interfone] *** TOQUE SIMULADO ***");
+  playTone(800, 1000);
+  playTone(0,   400);
+  playTone(800, 1000);
+  playTone(0,   400);
+}
+
+void tocarDTMF() {
+  Serial.println("[DFPlayer] Enviando DTMF *1");
+  playTone(941, 700);
+  playTone(0,   300);
+  playTone(697, 700);
+  playTone(0,   300);
+}
+
+// ========================================================
+//  FUNÇÃO ÚNICA QUE EXECUTA TODO O PROCESSO DO INTERFONE
+// --------------------------------------------------------
+void simularProcessoInterfone() {
+  tocarRing();
+
+  Serial.println("[Relé] Atendendo chamada");
+  digitalWrite(RELAY_PIN, HIGH);
+  delay(1600);
+
+  tocarDTMF();
+
+  digitalWrite(RELAY_PIN, LOW);
+  Serial.println("[Relé] Desligado – processo concluído\n");
+}
+
+// ========================================================
+// CALLBACKS MQTT -----------------------------------------
+void onEnableCmd(bool st, HASwitch* s) {
+  sistemaHabilitado = st;
+  digitalWrite(AVAIL_LED_PIN, st);
+  s->setState(st);
+  Serial.println(st ? "[Sistema] HABILITADO" : "[Sistema] DESABILITADO");
+}
+
+void onRingCmd(bool st, HASwitch* s) {
+  if (!st) return;          // só reage no ON
+  s->setState(false);       // volta ao OFF imediato
+
   if (!sistemaHabilitado) {
     Serial.println("[Interfone] Ignorado: sistema desabilitado");
-    sender->setState(false);
-    return;
-  }
-  if (acaoEmProgresso) {
-    Serial.println("[Interfone] Ação já em andamento");
-    sender->setState(false);
     return;
   }
 
-  acaoEmProgresso = true;
-  Serial.println("[Interfone] Toque SIMULADO → Atendendo...");
-
-  digitalWrite(RELAY_PIN, HIGH);  // ativa relé (atende)
-  delay(800);                     // pequena pausa simulando atendimento
-
-  Serial.println("[DFPlayer] (sim) Tocar DTMF *1");
-  delay(1200);                    // duração do áudio (simulado)
-
-  digitalWrite(RELAY_PIN, LOW);   // desliga relé
-  Serial.println("[Interfone] Processo concluído\n");
-
-  acaoEmProgresso = false;
-  sender->setState(false);        // retorna switch ao OFF
+  simularProcessoInterfone();  // *** CHAMADA CENTRAL ***
 }
 
 // ========================================================
-// SETUP
-// --------------------------------------------------------
 void setup() {
   Serial.begin(115200);
-  Serial.println("Iniciando ESP32 Interfone...");
+  Serial.println("ESP32 Interfone – refatorado");
 
   pinMode(RELAY_PIN, OUTPUT);      digitalWrite(RELAY_PIN, LOW);
   pinMode(AVAIL_LED_PIN, OUTPUT);  digitalWrite(AVAIL_LED_PIN, LOW);
 
-  // Conecta Wi-Fi
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print('.');
-    delay(500);
-  }
-  Serial.println("\nWi-Fi conectado");
+  // Buzzer: canal LEDC
+  ledcSetup(BUZZ_CH, 2000, 8);
+  ledcAttachPin(BUZZ_PIN, BUZZ_CH);
+  playTone(0, 1);
 
-  // Configura dispositivo Home Assistant
+  // Wi‑Fi
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  while (WiFi.status() != WL_CONNECTED) { Serial.print('.'); delay(400);}  
+  Serial.println("\nWi‑Fi conectado");
+
+  // Home‑Assistant device
   device.setName("ESP32 Interfone");
   device.enableSharedAvailability();
   device.enableLastWill();
 
-  // Registra switches MQTT
-  interfoneEnable.setName("Habilitar Interfone");
-  interfoneEnable.onCommand(onEnableCommand);
+  // Switches
+  swEnable.setName("Habilitar Interfone");
+  swEnable.onCommand(onEnableCmd);
 
-  interfoneRingSim.setName("Simular Toque de Interfone");
-  interfoneRingSim.onCommand(onRingSimCommand);
+  swRing.setName("Simular Toque de Interfone");
+  swRing.onCommand(onRingCmd);
 
-  // Inicia MQTT
   mqtt.begin(BROKER_ADDR, BROKER_USERNAME, BROKER_PASSWORD);
-  Serial.println("MQTT iniciado, aguardando comandos do Home Assistant.");
+  Serial.println("MQTT pronto — controle pelo Home Assistant");
 }
 
 // ========================================================
-// LOOP PRINCIPAL
-// --------------------------------------------------------
 void loop() {
   mqtt.loop();
 }
