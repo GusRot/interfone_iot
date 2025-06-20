@@ -1,34 +1,51 @@
 {
   "version": 1,
-  "author": "Projeto Interfone – 1 buzzer",
   "editor": "wokwi",
   "parts": [
-    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 80, "left": 0, "attrs": {} },
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 80, "left": 0 },
 
-    { "type": "wokwi-buzzer", "id": "buzzer", "top": -40, "left": 60, "attrs": { "label": "Buzzer (25)" } },
+    { "type": "wokwi-led", "id": "ledRing", "top": -40, "left": 60,
+      "attrs": { "color": "orange", "label": "Ring (32)" } },
 
-    { "type": "wokwi-led", "id": "ledRele", "top": 0, "left": 170, "attrs": { "color": "green", "label": "Relé (14)" } },
-    { "type": "wokwi-resistor", "id": "rRele", "top": 40, "left": 190, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "rRing", "top": 0, "left": 80,
+      "attrs": { "value": "220" } },
 
-    { "type": "wokwi-led", "id": "ledAvail", "top": 0, "left": 250, "attrs": { "color": "blue", "label": "Habilitado (27)" } },
-    { "type": "wokwi-resistor", "id": "rAvail", "top": 40, "left": 270, "attrs": { "value": "220" } }
+    { "type": "wokwi-led", "id": "ledDTMF", "top": -40, "left": 140,
+      "attrs": { "color": "pink", "label": "DTMF (33)" } },
+
+    { "type": "wokwi-resistor", "id": "rDTMF", "top": 0, "left": 160,
+      "attrs": { "value": "220" } },
+
+    { "type": "wokwi-led", "id": "ledRel", "top": 40, "left": 200,
+      "attrs": { "color": "green", "label": "Relé (14)" } },
+
+    { "type": "wokwi-resistor", "id": "rRel", "top": 80, "left": 220,
+      "attrs": { "value": "220" } },
+
+    { "type": "wokwi-led", "id": "ledAv", "top": 40, "left": 270,
+      "attrs": { "color": "blue", "label": "Habilitado (27)" } },
+
+    { "type": "wokwi-resistor", "id": "rAv", "top": 80, "left": 290,
+      "attrs": { "value": "220" } }
   ],
-
   "connections": [
     ["esp:TX", "$serialMonitor:RX", "", []],
     ["esp:RX", "$serialMonitor:TX", "", []],
 
-    ["esp:25", "buzzer:SIG", "red", []],
-    ["buzzer:GND", "esp:GND.1", "black", []],
+    ["esp:32", "ledRing:A", "orange", []],
+    ["ledRing:C", "rRing:1", "black", []],
+    ["rRing:2", "esp:GND.1", "black", []],
 
-    ["esp:14", "ledRele:A", "green", []],
-    ["ledRele:C", "rRele:1", "black", []],
-    ["rRele:2", "esp:GND.2", "black", []],
+    ["esp:33", "ledDTMF:A", "pink", []],
+    ["ledDTMF:C", "rDTMF:1", "black", []],
+    ["rDTMF:2", "esp:GND.1", "black", []],
 
-    ["esp:27", "ledAvail:A", "blue", []],
-    ["ledAvail:C", "rAvail:1", "black", []],
-    ["rAvail:2", "esp:GND.2", "black", []]
-  ],
+    ["esp:14", "ledRel:A", "green", []],
+    ["ledRel:C", "rRel:1", "black", []],
+    ["rRel:2", "esp:GND.2", "black", []],
 
-  "dependencies": {}
+    ["esp:27", "ledAv:A", "blue", []],
+    ["ledAv:C", "rAv:1", "black", []],
+    ["rAv:2", "esp:GND.2", "black", []]
+  ]
 }

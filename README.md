@@ -1,81 +1,92 @@
-# ESP32 Interfone IoT – README
+### README – Firmware “ESP32 Interfone IoT”
 
-Este projeto demonstra uma automação de interfone baseada em **ESP32** totalmente integrada ao **Home Assistant**.  A placa detecta um toque (simulado) do interfone, “atende” a ligação via relé e envia o comando DTMF `*1` (simulado por um buzzer) para abrir o portão do condomínio.
-
----
-
-## 📐 Visão Geral
-
-| Recurso                   | Como é implementado                                                         |
-| ------------------------- | --------------------------------------------------------------------------- |
-| **Atender o interfone**   | Relé no pino 14 que fecha o gancho do telefone                              |
-| **Envio de DTMF**         | Buzzer no pino 25 reproduz os tons correspondentes a `*` e `1`              |
-| **Habilitar/Desabilitar** | Switch `interfone_enable` no painel do HA; LED azul (pino 27) indica estado |
-| **Simular toque**         | Switch `interfone_ring_sim` aciona todo o fluxo (para testes)               |
-| **Logs**                  | Mensagens via `Serial.println()` visíveis no monitor serial                 |
+*(versão de testes com LEDs de feedback visual)*
 
 ---
 
-## 🛠 Componentes
+## 1 . Visão geral
 
-| Hardware                  | Função                                |
-| ------------------------- | ------------------------------------- |
-| ESP32 DevKit v4           | Microcontrolador Wi‑Fi                |
-| Relé 1 canal (5 V)        | Atender o telefone (pino 14)          |
-| Buzzer passivo            | Sons de toque e DTMF (pino 25)        |
-| LED azul + resistor 220 Ω | Indica “sistema habilitado” (pino 27) |
-| Fonte 5 V USB             | Alimentação do ESP32                  |
+Este firmware transforma um ESP32 em um controlador do interfone:
 
-> Para a simulação no **Wokwi** usa‑se apenas buzzer, dois LEDs e o relé é representado pelo LED verde.
+1. **Toca o interfone** (simulado).
+2. **Atende** a chamada por meio de um relé.
+3. **Envia o tom DTMF “\*1”** para abrir o portão.
+4. Tudo é **controlado via Home Assistant** usando MQTT.
 
----
+Para facilitar testes sem hardware de áudio, dois LEDs substituem temporariamente o buzzer/DFPlayer:
 
-## ⚡ Ligações (resumo)
-
-* **P25 →** Buzzer SIG   (+ GND)
-* **P14 →** Relé IN (ou LED verde A)
-* **P27 →** LED azul A   (+ resistor → GND)
-* **GND →** GND de todos os periféricos
-* **TX/RX** ligados ao `$serialMonitor` no Wokwi para exibir logs
+| Ação real                 | Substituto visual | Pino    |
+| ------------------------- | ----------------- | ------- |
+| Toque do interfone (ring) | LED laranja       | GPIO 32 |
+| Tom DTMF \*1              | LED rosa          | GPIO 33 |
 
 ---
 
-## 💾 Código–chave (`main.cpp`)
+## 2 . Por que LEDs em vez de som?
 
-* **`playTone()`** – wrapper sobre LEDC (`ledcWriteTone`) para gerar som.
-* **`tocarRing()` / `tocarDTMF()`** – sequências de tons.
-* **`simularProcessoInterfone()`** – executa todo o fluxo (ring → relé → DTMF).
-* **MQTT/HA** – dois `HASwitch` controlam habilitação e simulação.
-
----
-
-## 🚀 Como testar
-
-1. **Clonar** o projeto (PlatformIO ou Arduino IDE).
-2. Ajustar `WIFI_SSID/WIFI_PASSWORD` e broker (`BROKER_ADDR`).
-3. Carregar na placa **ESP32** ou abrir no **Wokwi** com o `diagram.json` fornecido.
-4. No Home Assistant:
-
-   * Adicionar a integração **MQTT** (se necessário).
-   * Dois botões surgirão automaticamente via auto‑discovery:
-
-     * `Habilitar Interfone`
-     * `Simular Toque de Interfone`
-5. Clique em **Habilitar Interfone**: LED azul acende.
-6. Clique em **Simular Toque**: você ouvirá o toque, o LED verde (relé) acende, depois o tom DTMF é tocado.
-7. Observe o **Serial Monitor** para logs detalhados.
+* **Limitação do simulador Wokwi:** o periférico LEDC/Tone do ESP32 para de funcionar depois que o Wi-Fi é inicializado, impedindo que o ícone de buzzer pisque.
+* **Feedback rápido:** piscar LEDs garante que o fluxo possa ser validado por qualquer pessoa, mesmo sem áudio ou transformador acoplado.
+* **Compatível com a placa real:** basta trocar as chamadas `blinkLED()` por `tone()`/DFPlayer quando o hardware definitivo estiver disponível.
 
 ---
 
-## 📝 Personalizações
+## 3 . Pinagem utilizada
 
-* **Duração dos tons**: ajustar tempos em `tocarRing()` / `tocarDTMF()`.
-* **Frequências reais DTMF**: usar duas saídas DAC ou mixer externo para reproduzir pares de tons.
-* **Relé físico**: ligar o módulo 5 V ao botão de gancho do telefone.
-* **DFPlayer Mini**: substituir o buzzer para reproduzir áudio real `*1.mp3`.
+| Função                            | GPIO    | Observação                  |
+| --------------------------------- | ------- | --------------------------- |
+| Relé (gancho)                     | **14**  | Pulso HIGH/LOW para atender |
+| LED “Sistema habilitado”          | **27**  | Azul                        |
+| LED “Ring” (simula bip)           | **32**  | Laranja                     |
+| LED “DTMF” (simula tom)           | **33**  | Rosa                        |
+| — Reservados para etapa final —   |         |                             |
+| Sensor KY-037 (detecção de toque) | 35      | Ainda não conectado         |
+| DFPlayer Mini (TX/RX)             | 16 / 17 | Ainda não conectado         |
 
 ---
 
-## 🧑‍💻 Licença
+## 4 . Tópicos MQTT
 
-Projeto de demonstração para fins acadêmicos – livre para modificar e reutilizar.
+| Tópico                   | Payload    | Função                                                                |
+| ------------------------ | ---------- | --------------------------------------------------------------------- |
+| `interfone_enable/set`   | `ON`/`OFF` | Liga ou desliga o sistema                                             |
+| `interfone_ring_sim/set` | `ON`       | Dispara o fluxo de toque (apenas `ON`; volta a `OFF` automaticamente) |
+
+*Discovery* do Home Assistant cria duas entidades “switch” correspondentes.
+
+---
+
+## 5 . Fluxo de estados
+
+1. **Sistema desabilitado (`OFF`)**
+   *LED azul apagado*
+   • O LED Ring pisca, mas relé + DTMF **não** executam.
+2. **Sistema habilitado (`ON`)**
+   *LED azul aceso*
+   • Ao receber comando de toque:
+
+   1. LED Ring pisca duas vezes.
+   2. Relé aciona (LED verde, se conectado).
+   3. LED DTMF pisca duas vezes.
+   4. Relé desliga.
+
+---
+
+## 6 . Compilação e simulação
+### 6.1  Ambiente
+
+* **PlatformIO** + framework *arduino-esp32*
+* **Wokwi** para simulação rápida
+*Para simular no Wokwi* não é preciso nenhuma flag extra, pois o firmware já usa apenas LEDs.
+
+
+## 7 . Próximos passos
+
+1. **Integrar KY-037**: disparo automático do fluxo quando o interfone real tocar.
+2. **Substituir LEDs por DFPlayer Mini** + transformador 600 : 600 para injetar tom DTMF “\*1”.
+3. **Ajustar pinagem** (relé → GPIO 25, DFPlayer em 16/17) conforme documento do hardware.
+
+---
+
+## 8 . Licença
+
+Código liberado sob MIT. Use e modifique à vontade.
